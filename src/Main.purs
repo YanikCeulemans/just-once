@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Console (logShow)
 import Totp (runTotp)

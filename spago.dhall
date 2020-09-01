@@ -14,6 +14,7 @@ You can edit this file as you like.
   , "generics-rep"
   , "integers"
   , "maybe"
+  , "now"
   , "psci-support"
   , "result"
   , "spec"
