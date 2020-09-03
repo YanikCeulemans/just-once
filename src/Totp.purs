@@ -1,4 +1,4 @@
-module Totp (runTotp) where
+module Totp (runTotp, totpConfig, TotpConfig) where
 
 import Base32 (decode)
 import Data.Array (length, replicate, unsnoc, (!!))
@@ -14,30 +14,37 @@ import Debug.Trace (spy)
 import Effect (Effect)
 import Effect.Now (now)
 import Node.Buffer (Buffer, toArray)
-import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<$>), (<<<), (<>), (==), (>), (>>=))
+import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=))
 import SharedTypes (HexString(..))
 
 
-t0 :: Number
-t0 = 0.0
+newtype TotpConfig = TotpConfig
+  { t0 :: Number
+  , step :: Number
+  , secret :: String
+  }
 
 
-step :: Number
-step = 30.0
+totpConfig :: String -> TotpConfig
+totpConfig secret = TotpConfig
+  { t0 : 0.0
+  , step : 30.0
+  , secret
+  }
 
 
-runTotp :: Effect (Maybe String)
-runTotp = do
-  present <- now
-  case decode "MFKWMTLRJ5KUWNCYNV4EKT2KNZFS6TSI" of
+runTotp :: TotpConfig -> Effect (Maybe String)
+runTotp (TotpConfig { t0, step, secret }) = do
+  counter <- now <#> counterHexString t0 step
+  case decode secret of
     Nothing -> pure Nothing
-    Just secret -> do
-      hmac <- createHmac secret (counterHexString present) >>= toArray
+    Just decodedSecret -> do
+      hmac <- createHmac { secret: decodedSecret, counter } >>= toArray
       pure $ createHotp hmac
 
 
-counterHexString :: Instant -> HexString
-counterHexString present =
+counterHexString :: Number -> Number -> Instant -> HexString
+counterHexString t0 step present =
   let
     duration = unInstant present # toDuration :: Milliseconds
 
@@ -73,4 +80,4 @@ getBinCode offset initHmacArr = do
     pure $ b1 .|. b2 .|. b3 .|. b4
 
 
-foreign import createHmac :: HexString -> HexString -> Effect Buffer
+foreign import createHmac :: { secret :: HexString, counter :: HexString } -> Effect Buffer
