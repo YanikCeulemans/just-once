@@ -1,46 +1,56 @@
-module Totp (runTotp, totpConfig, TotpConfig) where
+module Totp (runTotp, totpConfig, toSecret, TotpConfig, Secret) where
 
 import Base32 (decode)
+import Control.Monad.Trans.Class (lift)
 import Data.Array (length, replicate, unsnoc, (!!))
-import Data.DateTime.Instant (Instant, unInstant)
+import Data.DateTime (time)
+import Data.DateTime.Instant (Instant, toDateTime, unInstant)
+import Data.Enum (fromEnum)
 import Data.Int (floor, hexadecimal, pow, toStringAs)
 import Data.Int.Bits (and, shl, (.&.), (.|.))
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as S
 import Data.String.CodeUnits (takeRight)
+import Data.Time (second)
 import Data.Time.Duration (Milliseconds, Seconds(..), convertDuration, toDuration)
 import Debug.Trace (spy)
 import Effect (Effect)
 import Effect.Now (now)
 import Node.Buffer (Buffer, toArray)
-import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=))
+import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (>>>))
 import SharedTypes (HexString(..))
+
+
+newtype Secret = Secret String
+
+
+toSecret :: String -> Maybe Secret
+toSecret encoded = decode encoded <#> (\(HexString s) -> Secret s)
 
 
 newtype TotpConfig = TotpConfig
   { t0 :: Number
   , step :: Number
-  , secret :: String
+  , secret :: Secret
   }
 
 
-totpConfig :: String -> TotpConfig
-totpConfig secret = TotpConfig
+totpConfig :: Secret -> TotpConfig
+totpConfig s = TotpConfig
   { t0 : 0.0
   , step : 30.0
-  , secret
+  , secret : s
   }
 
 
 runTotp :: TotpConfig -> Effect (Maybe String)
 runTotp (TotpConfig { t0, step, secret }) = do
   counter <- now <#> counterHexString t0 step
-  case decode secret of
-    Nothing -> pure Nothing
-    Just decodedSecret -> do
-      hmac <- createHmac { secret: decodedSecret, counter } >>= toArray
-      pure $ createHotp hmac
+  currentSeconds <- now <#> toDateTime >>> time >>> second >>> fromEnum
+  let _ = spy "current seconds" currentSeconds
+  hmac <- createHmac secret counter >>= toArray
+  pure $ createHotp hmac
 
 
 counterHexString :: Number -> Number -> Instant -> HexString
@@ -80,4 +90,4 @@ getBinCode offset initHmacArr = do
     pure $ b1 .|. b2 .|. b3 .|. b4
 
 
-foreign import createHmac :: { secret :: HexString, counter :: HexString } -> Effect Buffer
+foreign import createHmac :: Secret -> HexString -> Effect Buffer
