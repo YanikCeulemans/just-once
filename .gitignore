@@ -8,3 +8,8 @@
 /.purs*
 /.psa*
 /.spago
+/.cache
+/.vscode
+
+package-lock.json
+/dist

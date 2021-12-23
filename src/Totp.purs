@@ -1,12 +1,11 @@
 module Totp (runTotp, totpConfig, toSecret, TotpConfig, Secret) where
 
 import Base32 (decode)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (length, replicate, unsnoc, (!!))
-import Data.DateTime (time)
+import Data.DateTime (Second, time)
 import Data.DateTime.Instant (Instant, toDateTime, unInstant)
-import Data.Enum (fromEnum)
-import Data.Int (floor, hexadecimal, pow, toStringAs)
+import Data.Enum (fromEnum, toEnum)
+import Data.Int (floor, hexadecimal, pow, round, toStringAs)
 import Data.Int.Bits (and, shl, (.&.), (.|.))
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
@@ -14,11 +13,10 @@ import Data.String as S
 import Data.String.CodeUnits (takeRight)
 import Data.Time (second)
 import Data.Time.Duration (Milliseconds, Seconds(..), convertDuration, toDuration)
-import Debug.Trace (spy)
 import Effect (Effect)
 import Effect.Now (now)
 import Node.Buffer (Buffer, toArray)
-import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=), (>>>))
+import Prelude (bind, flip, mod, otherwise, pure, show, (#), ($), (+), (-), (/), (<#>), (<$>), (<<<), (<>), (==), (>), (>>=))
 import SharedTypes (HexString(..))
 
 
@@ -44,13 +42,34 @@ totpConfig s = TotpConfig
   }
 
 
-runTotp :: TotpConfig -> Effect (Maybe String)
+type Totp =
+  { code :: String
+  , validFor :: Second
+  }
+
+
+runTotp :: TotpConfig -> Effect (Maybe Totp)
 runTotp (TotpConfig { t0, step, secret }) = do
-  counter <- now <#> counterHexString t0 step
-  currentSeconds <- now <#> toDateTime >>> time >>> second >>> fromEnum
-  let _ = spy "current seconds" currentSeconds
+  { counter, currentSeconds } <- now <#> totpTimeData
   hmac <- createHmac secret counter >>= toArray
-  pure $ createHotp hmac
+  pure $ do
+    hotp <- createHotp hmac
+    validFor <- calcValidFor (round step) currentSeconds
+    pure { code: hotp, validFor }
+  where
+    calcValidFor :: Int -> Second -> Maybe Second
+    calcValidFor iStep seconds
+      | iStep > 0 =
+          iStep - (fromEnum seconds `mod` iStep) # toEnum
+      | otherwise  = Nothing
+
+    totpTimeData :: Instant -> { counter :: HexString, currentSeconds :: Second }
+    totpTimeData instant =
+      { counter, currentSeconds }
+      where
+        counter = counterHexString t0 step instant
+        currentSeconds = toDateTime instant # time # second
+
 
 
 counterHexString :: Number -> Number -> Instant -> HexString

@@ -1,0 +1,26 @@
+{
+  "name": "just-once",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "dev": "parcel index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YanikCeulemans/just-once.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YanikCeulemans/just-once/issues"
+  },
+  "homepage": "https://github.com/YanikCeulemans/just-once#readme",
+  "devDependencies": {
+    "parcel": "^1.12.4"
+  }
+}
